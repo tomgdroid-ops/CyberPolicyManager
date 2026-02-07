@@ -19,6 +19,7 @@ export default function CompliancePage() {
   const [latestAnalysis, setLatestAnalysis] = useState<AnalysisResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [running, setRunning] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     Promise.all([
@@ -27,6 +28,15 @@ export default function CompliancePage() {
     ])
       .then(([fws, als]) => {
         // Handle error responses - API may return { error: "..." } instead of array
+        if (fws?.error) {
+          setError(fws.error);
+          return;
+        }
+        if (als?.error) {
+          setError(als.error);
+          return;
+        }
+
         const frameworkList = Array.isArray(fws) ? fws : [];
         const analysisList = Array.isArray(als) ? als : [];
 
@@ -36,7 +46,10 @@ export default function CompliancePage() {
         const completed = analysisList.filter((a: AnalysisResult) => a.status === "completed");
         if (completed.length > 0) setLatestAnalysis(completed[0]);
       })
-      .catch(console.error)
+      .catch((err) => {
+        console.error(err);
+        setError("Failed to load data. Please try again.");
+      })
       .finally(() => setLoading(false));
   }, []);
 
@@ -86,6 +99,25 @@ export default function CompliancePage() {
         {} as Record<string, number>
       )
     : {};
+
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <h1 className="text-3xl font-bold">Compliance Analysis</h1>
+        <Card className="border-red-200 bg-red-50">
+          <CardContent className="py-6">
+            <div className="flex items-center gap-3">
+              <AlertTriangle className="h-5 w-5 text-red-600" />
+              <div>
+                <p className="font-medium text-red-800">Error loading data</p>
+                <p className="text-sm text-red-700">{error}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
