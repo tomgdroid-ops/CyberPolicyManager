@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dir:*)",
+      "Bash(node:*)",
+      "Bash(npm:*)",
+      "Bash(npx create-next-app:*)",
+      "Bash(echo:*)",
+      "Bash(npx next build:*)",
+      "Bash(git init:*)",
+      "Bash(DATABASE_URL=\"postgresql://neondb_owner:npg_MDRrigq17LGu@ep-calm-night-ai4qscfu-pooler.c-4.us-east-1.aws.neon.tech/neondb?sslmode=require\" npx tsx:*)",
+      "Bash(git add:*)"
+    ]
+  }
+}
