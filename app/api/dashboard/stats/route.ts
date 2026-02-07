@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
-import { requireSession } from "@/lib/session";
+import { requireOrganization } from "@/lib/session";
 import { query } from "@/lib/db";
 
 export async function GET() {
   try {
-    await requireSession();
+    const { organizationId } = await requireOrganization();
 
     const [policyCounts, overdueReviews, latestAnalysis, recentActivity] = await Promise.all([
       query(`
@@ -15,23 +15,25 @@ export async function GET() {
           COUNT(*) FILTER (WHERE status = 'finalized') as finalized_count,
           COUNT(*) FILTER (WHERE status = 'archived') as archived_count
         FROM policies
-      `),
+        WHERE organization_id = $1
+      `, [organizationId]),
       query(`
         SELECT COUNT(*) as count FROM policies
-        WHERE review_date < CURRENT_DATE AND status = 'finalized'
-      `),
+        WHERE organization_id = $1 AND review_date < CURRENT_DATE AND status = 'finalized'
+      `, [organizationId]),
       query(`
         SELECT overall_score FROM analysis_results
-        WHERE status = 'completed'
+        WHERE organization_id = $1 AND status = 'completed'
         ORDER BY completed_at DESC LIMIT 1
-      `),
+      `, [organizationId]),
       query(`
         SELECT a.id, a.action, a.entity_type, a.created_at, a.details,
                u.name as user_name
         FROM audit_log a
         LEFT JOIN users u ON a.user_id = u.id
+        WHERE a.organization_id = $1
         ORDER BY a.created_at DESC LIMIT 10
-      `),
+      `, [organizationId]),
     ]);
 
     return NextResponse.json({
@@ -47,8 +49,13 @@ export async function GET() {
       recent_activity: recentActivity.rows,
     });
   } catch (error) {
-    if (error instanceof Error && error.message === "Unauthorized") {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (error instanceof Error) {
+      if (error.message === "Unauthorized") {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      }
+      if (error.message === "No organization selected") {
+        return NextResponse.json({ error: "No organization selected" }, { status: 400 });
+      }
     }
     console.error("Dashboard stats error:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

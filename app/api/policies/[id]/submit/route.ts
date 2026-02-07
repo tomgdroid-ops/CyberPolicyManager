@@ -1,16 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireSession } from "@/lib/session";
+import { requireOrgUser } from "@/lib/session";
 import { getPolicyById, updatePolicyStatus, createPolicyVersion } from "@/lib/queries/policies";
 import { logAudit } from "@/lib/queries/audit";
 import { createNotification } from "@/lib/queries/notifications";
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const session = await requireSession();
+    const { session, organizationId } = await requireOrgUser();
     const { id } = await params;
     const body = await request.json().catch(() => ({}));
 
-    const policy = await getPolicyById(id);
+    const policy = await getPolicyById(id, organizationId);
     if (!policy) return NextResponse.json({ error: "Policy not found" }, { status: 404 });
 
     if (policy.status !== "draft" && policy.status !== "revision") {
@@ -18,14 +18,15 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     }
 
     await createPolicyVersion(id, "submitted_for_review", session.user.id, body.comment);
-    const updated = await updatePolicyStatus(id, "review");
+    const updated = await updatePolicyStatus(id, organizationId, "review");
 
-    await logAudit(session.user.id, "policy.submitted_for_review", "policy", id, {
+    await logAudit(organizationId, session.user.id, "policy.submitted_for_review", "policy", id, {
       from: policy.status, to: "review",
     });
 
     if (policy.owner_id && policy.owner_id !== session.user.id) {
       await createNotification(
+        organizationId,
         policy.owner_id,
         "policy.submitted",
         `Policy "${policy.policy_name}" submitted for review`,
@@ -36,8 +37,13 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     return NextResponse.json(updated);
   } catch (error) {
-    if (error instanceof Error && error.message === "Unauthorized") {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (error instanceof Error) {
+      if (error.message === "Unauthorized") {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      }
+      if (error.message.includes("Forbidden") || error.message.includes("Requires")) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
     }
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }

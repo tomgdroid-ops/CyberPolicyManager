@@ -2,10 +2,10 @@ import { Pool } from "pg";
 import * as fs from "fs";
 import * as path from "path";
 
-const DATABASE_URL = process.env.DATABASE_URL || "postgresql://postgres:postgres@localhost:5432/policyvault";
+const DATABASE_URL = process.env.DATABASE_URL || "postgresql://neondb_owner:npg_MDRrigq17LGu@ep-calm-night-ai4qscfu-pooler.c-4.us-east-1.aws.neon.tech/neondb?sslmode=require";
 
 async function migrate() {
-  const pool = new Pool({ connectionString: DATABASE_URL });
+  const pool = new Pool({ connectionString: DATABASE_URL, ssl: { rejectUnauthorized: false } });
   const client = await pool.connect();
 
   try {

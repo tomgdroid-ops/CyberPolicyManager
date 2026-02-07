@@ -1,16 +1,19 @@
 import { query } from "@/lib/db";
 import { CreatePolicyInput, UpdatePolicyInput } from "@/types/policy";
 
-export async function listPolicies(filters?: {
-  status?: string;
-  search?: string;
-  owner_id?: string;
-  limit?: number;
-  offset?: number;
-}) {
-  const conditions: string[] = [];
-  const params: unknown[] = [];
-  let idx = 1;
+export async function listPolicies(
+  organizationId: string,
+  filters?: {
+    status?: string;
+    search?: string;
+    owner_id?: string;
+    limit?: number;
+    offset?: number;
+  }
+) {
+  const conditions: string[] = ["p.organization_id = $1"];
+  const params: unknown[] = [organizationId];
+  let idx = 2;
 
   if (filters?.status) {
     conditions.push(`p.status = $${idx++}`);
@@ -26,7 +29,7 @@ export async function listPolicies(filters?: {
     params.push(filters.owner_id);
   }
 
-  const where = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+  const where = `WHERE ${conditions.join(" AND ")}`;
   const limit = filters?.limit || 100;
   const offset = filters?.offset || 0;
 
@@ -55,27 +58,43 @@ export async function listPolicies(filters?: {
   };
 }
 
-export async function getPolicyById(id: string) {
-  const result = await query(
-    `SELECT p.*,
-            o.name as owner_name,
-            a.name as author_name
-     FROM policies p
-     LEFT JOIN users o ON p.owner_id = o.id
-     LEFT JOIN users a ON p.author_id = a.id
-     WHERE p.id = $1`,
-    [id]
-  );
+export async function getPolicyById(id: string, organizationId?: string) {
+  const result = organizationId
+    ? await query(
+        `SELECT p.*,
+                o.name as owner_name,
+                a.name as author_name
+         FROM policies p
+         LEFT JOIN users o ON p.owner_id = o.id
+         LEFT JOIN users a ON p.author_id = a.id
+         WHERE p.id = $1 AND p.organization_id = $2`,
+        [id, organizationId]
+      )
+    : await query(
+        `SELECT p.*,
+                o.name as owner_name,
+                a.name as author_name
+         FROM policies p
+         LEFT JOIN users o ON p.owner_id = o.id
+         LEFT JOIN users a ON p.author_id = a.id
+         WHERE p.id = $1`,
+        [id]
+      );
   return result.rows[0] || null;
 }
 
-export async function createPolicy(data: CreatePolicyInput, authorId: string) {
+export async function createPolicy(
+  organizationId: string,
+  data: CreatePolicyInput,
+  authorId: string
+) {
   const result = await query(
-    `INSERT INTO policies (policy_code, policy_name, description, scope, owner_id, author_id,
+    `INSERT INTO policies (organization_id, policy_code, policy_name, description, scope, owner_id, author_id,
        department, classification, effective_date, review_date, review_frequency_months)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
      RETURNING *`,
     [
+      organizationId,
       data.policy_code,
       data.policy_name,
       data.description || null,
@@ -92,7 +111,11 @@ export async function createPolicy(data: CreatePolicyInput, authorId: string) {
   return result.rows[0];
 }
 
-export async function updatePolicy(id: string, data: UpdatePolicyInput) {
+export async function updatePolicy(
+  id: string,
+  organizationId: string,
+  data: UpdatePolicyInput
+) {
   const sets: string[] = [];
   const params: unknown[] = [];
   let idx = 1;
@@ -113,26 +136,31 @@ export async function updatePolicy(id: string, data: UpdatePolicyInput) {
 
   sets.push("updated_at = now()");
   params.push(id);
+  params.push(organizationId);
 
   const result = await query(
-    `UPDATE policies SET ${sets.join(", ")} WHERE id = $${idx} AND status = 'draft' RETURNING *`,
+    `UPDATE policies SET ${sets.join(", ")} WHERE id = $${idx++} AND organization_id = $${idx} AND status = 'draft' RETURNING *`,
     params
   );
   return result.rows[0] || null;
 }
 
-export async function deletePolicy(id: string) {
+export async function deletePolicy(id: string, organizationId: string) {
   const result = await query(
-    "DELETE FROM policies WHERE id = $1 AND status = 'draft' RETURNING id",
-    [id]
+    "DELETE FROM policies WHERE id = $1 AND organization_id = $2 AND status = 'draft' RETURNING id",
+    [id, organizationId]
   );
   return result.rows[0] || null;
 }
 
-export async function updatePolicyStatus(id: string, newStatus: string) {
+export async function updatePolicyStatus(
+  id: string,
+  organizationId: string,
+  newStatus: string
+) {
   const result = await query(
-    `UPDATE policies SET status = $1, updated_at = now() WHERE id = $2 RETURNING *`,
-    [newStatus, id]
+    `UPDATE policies SET status = $1, updated_at = now() WHERE id = $2 AND organization_id = $3 RETURNING *`,
+    [newStatus, id, organizationId]
   );
   return result.rows[0] || null;
 }
@@ -170,7 +198,13 @@ export async function createPolicyVersion(
   return result.rows[0];
 }
 
-export async function getPolicyVersions(policyId: string) {
+export async function getPolicyVersions(policyId: string, organizationId?: string) {
+  // First verify the policy belongs to the organization
+  if (organizationId) {
+    const policy = await getPolicyById(policyId, organizationId);
+    if (!policy) return [];
+  }
+
   const result = await query(
     `SELECT pv.*, u.name as changed_by_name
      FROM policy_versions pv
@@ -194,4 +228,37 @@ export async function incrementPolicyVersion(id: string, major: boolean = false)
       [id]
     );
   }
+}
+
+// Get policy statistics for an organization
+export async function getPolicyStats(organizationId: string) {
+  const result = await query(
+    `SELECT
+       COUNT(*) as total,
+       COUNT(*) FILTER (WHERE status = 'draft') as draft,
+       COUNT(*) FILTER (WHERE status = 'review') as review,
+       COUNT(*) FILTER (WHERE status = 'finalized') as finalized,
+       COUNT(*) FILTER (WHERE status = 'archived') as archived,
+       COUNT(*) FILTER (WHERE status = 'revision') as revision,
+       COUNT(*) FILTER (WHERE review_date < CURRENT_DATE AND status = 'finalized') as overdue_review
+     FROM policies
+     WHERE organization_id = $1`,
+    [organizationId]
+  );
+  return result.rows[0];
+}
+
+// Get policies due for review
+export async function getPoliciesDueForReview(organizationId: string, daysAhead: number = 30) {
+  const result = await query(
+    `SELECT p.*, o.name as owner_name
+     FROM policies p
+     LEFT JOIN users o ON p.owner_id = o.id
+     WHERE p.organization_id = $1
+       AND p.status = 'finalized'
+       AND p.review_date <= CURRENT_DATE + INTERVAL '1 day' * $2
+     ORDER BY p.review_date ASC`,
+    [organizationId, daysAhead]
+  );
+  return result.rows;
 }
