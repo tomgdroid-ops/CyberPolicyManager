@@ -13,20 +13,20 @@ const updateOrgSchema = z.object({
   name: z.string().min(1).max(500).optional(),
   industry: z.string().max(255).optional(),
   description: z.string().optional(),
-  logoUrl: z.string().url().optional().nullable(),
-  settings: z.record(z.unknown()).optional(),
+  logoUrl: z.string().url().optional(),
+  settings: z.record(z.string(), z.unknown()).optional(),
   isActive: z.boolean().optional(),
 });
 
-interface RouteParams {
-  params: { id: string };
-}
+type RouteContext = {
+  params: Promise<{ id: string }>;
+};
 
 // GET /api/organizations/[id] - Get organization details
-export async function GET(request: Request, { params }: RouteParams) {
+export async function GET(request: Request, context: RouteContext) {
   try {
     const session = await requireSession();
-    const { id } = params;
+    const { id } = await context.params;
 
     // Check access
     const canAccess = await canAccessOrganization(id);
@@ -57,10 +57,10 @@ export async function GET(request: Request, { params }: RouteParams) {
 }
 
 // PUT /api/organizations/[id] - Update organization (super_admin or org_admin)
-export async function PUT(request: Request, { params }: RouteParams) {
+export async function PUT(request: Request, context: RouteContext) {
   try {
     const session = await requireSession();
-    const { id } = params;
+    const { id } = await context.params;
 
     // Check if user is super_admin or org_admin for this org
     const role = await getOrgRole(id);
@@ -107,10 +107,10 @@ export async function PUT(request: Request, { params }: RouteParams) {
 }
 
 // DELETE /api/organizations/[id] - Deactivate organization (super_admin only)
-export async function DELETE(request: Request, { params }: RouteParams) {
+export async function DELETE(request: Request, context: RouteContext) {
   try {
     const session = await requireSuperAdmin();
-    const { id } = params;
+    const { id } = await context.params;
 
     // Prevent deletion of default organization
     if (id === "00000000-0000-0000-0000-000000000001") {

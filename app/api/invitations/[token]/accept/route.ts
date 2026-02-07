@@ -6,15 +6,15 @@ import {
 } from "@/lib/queries/organization-members";
 import { logAudit } from "@/lib/queries/audit";
 
-interface RouteParams {
-  params: { token: string };
-}
+type RouteContext = {
+  params: Promise<{ token: string }>;
+};
 
 // POST /api/invitations/[token]/accept - Accept an invitation
-export async function POST(request: Request, { params }: RouteParams) {
+export async function POST(request: Request, context: RouteContext) {
   try {
     const session = await requireSession();
-    const { token } = params;
+    const { token } = await context.params;
 
     // Get the invitation
     const invitation = await getInvitationByToken(token);
@@ -81,9 +81,9 @@ export async function POST(request: Request, { params }: RouteParams) {
 }
 
 // GET /api/invitations/[token]/accept - Get invitation details (for preview)
-export async function GET(request: Request, { params }: RouteParams) {
+export async function GET(request: Request, context: RouteContext) {
   try {
-    const { token } = params;
+    const { token } = await context.params;
 
     const invitation = await getInvitationByToken(token);
 

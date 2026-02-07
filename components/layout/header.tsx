@@ -63,7 +63,9 @@ export function Header() {
               <User className="h-4 w-4" />
               <span className="font-medium">{session?.user?.name}</span>
               {isSuperAdmin && (
-                <Shield className="h-3 w-3 text-primary" title="Super Admin" />
+                <span title="Super Admin">
+                  <Shield className="h-3 w-3 text-primary" />
+                </span>
               )}
             </Button>
           </DropdownMenuTrigger>

@@ -12,15 +12,15 @@ const updateMemberSchema = z.object({
   role: z.enum(["org_admin", "org_user", "org_viewer"]),
 });
 
-interface RouteParams {
-  params: { id: string; memberId: string };
-}
+type RouteContext = {
+  params: Promise<{ id: string; memberId: string }>;
+};
 
 // PUT /api/organizations/[id]/members/[memberId] - Update member role
-export async function PUT(request: Request, { params }: RouteParams) {
+export async function PUT(request: Request, context: RouteContext) {
   try {
     const session = await requireSession();
-    const { id: organizationId, memberId } = params;
+    const { id: organizationId, memberId } = await context.params;
 
     // Check if user is org_admin or super_admin
     const role = await getOrgRole(organizationId);
@@ -73,10 +73,10 @@ export async function PUT(request: Request, { params }: RouteParams) {
 }
 
 // DELETE /api/organizations/[id]/members/[memberId] - Remove member
-export async function DELETE(request: Request, { params }: RouteParams) {
+export async function DELETE(request: Request, context: RouteContext) {
   try {
     const session = await requireSession();
-    const { id: organizationId, memberId } = params;
+    const { id: organizationId, memberId } = await context.params;
 
     // Check if user is org_admin or super_admin
     const role = await getOrgRole(organizationId);

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireSession } from "@/lib/session";
+import { requireOrganization } from "@/lib/session";
 import { getPolicyById } from "@/lib/queries/policies";
 import { query } from "@/lib/db";
 import { logAudit } from "@/lib/queries/audit";
@@ -11,10 +11,10 @@ import * as path from "path";
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const session = await requireSession();
+    const { session, organizationId } = await requireOrganization();
     const { id } = await params;
 
-    const policy = await getPolicyById(id);
+    const policy = await getPolicyById(id, organizationId);
     if (!policy) {
       return NextResponse.json({ error: "Policy not found" }, { status: 404 });
     }
@@ -68,11 +68,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         document_size_bytes = $4,
         document_content_text = $5,
         updated_at = now()
-       WHERE id = $6`,
-      [file.name, filePath, hash, buffer.length, contentText || null, id]
+       WHERE id = $6 AND organization_id = $7`,
+      [file.name, filePath, hash, buffer.length, contentText || null, id, organizationId]
     );
 
-    await logAudit(session.user.id, "policy.document_uploaded", "policy", id, {
+    await logAudit(organizationId, session.user.id, "policy.document_uploaded", "policy", id, {
       filename: file.name,
       size: buffer.length,
       text_extracted: !!contentText,
@@ -86,8 +86,13 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       text_length: contentText.length,
     });
   } catch (error) {
-    if (error instanceof Error && error.message === "Unauthorized") {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (error instanceof Error) {
+      if (error.message === "Unauthorized") {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      }
+      if (error.message === "No organization selected") {
+        return NextResponse.json({ error: "No organization selected" }, { status: 400 });
+      }
     }
     console.error("Upload error:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

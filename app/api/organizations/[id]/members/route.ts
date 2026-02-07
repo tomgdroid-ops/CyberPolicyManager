@@ -13,15 +13,15 @@ const addMemberSchema = z.object({
   role: z.enum(["org_admin", "org_user", "org_viewer"]),
 });
 
-interface RouteParams {
-  params: { id: string };
-}
+type RouteContext = {
+  params: Promise<{ id: string }>;
+};
 
 // GET /api/organizations/[id]/members - List organization members
-export async function GET(request: Request, { params }: RouteParams) {
+export async function GET(request: Request, context: RouteContext) {
   try {
     const session = await requireSession();
-    const { id: organizationId } = params;
+    const { id: organizationId } = await context.params;
 
     // Check access - any member can view the member list
     const role = await getOrgRole(organizationId);
@@ -42,10 +42,10 @@ export async function GET(request: Request, { params }: RouteParams) {
 }
 
 // POST /api/organizations/[id]/members - Add member (org_admin or super_admin)
-export async function POST(request: Request, { params }: RouteParams) {
+export async function POST(request: Request, context: RouteContext) {
   try {
     const session = await requireSession();
-    const { id: organizationId } = params;
+    const { id: organizationId } = await context.params;
 
     // Check if user is org_admin or super_admin
     const role = await getOrgRole(organizationId);

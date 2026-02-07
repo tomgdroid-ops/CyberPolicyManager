@@ -9,7 +9,20 @@
       "Bash(npx next build:*)",
       "Bash(git init:*)",
       "Bash(DATABASE_URL=\"postgresql://neondb_owner:npg_MDRrigq17LGu@ep-calm-night-ai4qscfu-pooler.c-4.us-east-1.aws.neon.tech/neondb?sslmode=require\" npx tsx:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nInitial commit: PolicyVault Phase 1 MVP\n\nCybersecurity Policy Management Platform featuring:\n- Next.js 16 full-stack with TypeScript\n- PostgreSQL database with 11 migration files\n- NextAuth.js authentication with JWT sessions\n- Policy lifecycle management \\(Draft → Review → Finalized → Archived\\)\n- Document upload with DOCX/PDF text extraction\n- NIST CSF 2.0 framework with 106 controls and 62 best practices\n- AI-powered compliance analysis using Claude API\n- Gap analysis and remediation recommendations\n- PDF and CSV report export\n- Notifications system\n- Audit logging\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git config:*)",
+      "Bash(gh:*)",
+      "Bash(git remote add:*)",
+      "Bash(git branch:*)",
+      "Bash(git push:*)",
+      "Bash(set \"DATABASE_URL=postgresql://neondb_owner:npg_MDRrigq17LGu@ep-calm-night-ai4qscfu-pooler.c-4.us-east-1.aws.neon.tech/neondb?sslmode=require\")",
+      "Bash(npx tsx:*)",
+      "Bash(git commit:*)",
+      "Bash(npx ts-node:*)",
+      "Bash(npx shadcn@latest add dropdown-menu:*)",
+      "Bash(npx --yes shadcn@latest init -d)",
+      "Bash(npx --yes shadcn@latest add dropdown-menu:*)"
     ]
   }
 }

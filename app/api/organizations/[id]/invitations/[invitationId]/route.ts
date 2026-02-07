@@ -4,15 +4,15 @@ import { cancelInvitation } from "@/lib/queries/organization-members";
 import { logAudit } from "@/lib/queries/audit";
 import { query } from "@/lib/db";
 
-interface RouteParams {
-  params: { id: string; invitationId: string };
-}
+type RouteContext = {
+  params: Promise<{ id: string; invitationId: string }>;
+};
 
 // DELETE /api/organizations/[id]/invitations/[invitationId] - Cancel invitation
-export async function DELETE(request: Request, { params }: RouteParams) {
+export async function DELETE(request: Request, context: RouteContext) {
   try {
     const session = await requireSession();
-    const { id: organizationId, invitationId } = params;
+    const { id: organizationId, invitationId } = await context.params;
 
     // Check if user is org_admin or super_admin
     const role = await getOrgRole(organizationId);

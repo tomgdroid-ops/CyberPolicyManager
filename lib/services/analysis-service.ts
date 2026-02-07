@@ -6,7 +6,7 @@ import { CategoryScore } from "@/types/analysis";
 
 const CONTROL_BATCH_SIZE = 20;
 
-export async function runAnalysis(analysisId: string, frameworkId: string, triggeredBy: string) {
+export async function runAnalysis(analysisId: string, organizationId: string, frameworkId: string, triggeredBy: string) {
   try {
     // Mark as running
     await query(
@@ -14,11 +14,12 @@ export async function runAnalysis(analysisId: string, frameworkId: string, trigg
       [analysisId]
     );
 
-    // Get all finalized policies with extracted text
+    // Get all finalized policies with extracted text for this organization
     const policiesResult = await query(
       `SELECT id, policy_name, policy_code, document_content_text
        FROM policies
-       WHERE status = 'finalized' AND document_content_text IS NOT NULL AND document_content_text != ''`
+       WHERE organization_id = $1 AND status = 'finalized' AND document_content_text IS NOT NULL AND document_content_text != ''`,
+      [organizationId]
     );
     const policies = policiesResult.rows;
 
@@ -46,7 +47,7 @@ export async function runAnalysis(analysisId: string, frameworkId: string, trigg
     // For each policy, analyze control mappings
     for (const policy of policies) {
       // Clear previous AI mappings for this policy
-      await deleteAiMappingsForPolicy(policy.id);
+      await deleteAiMappingsForPolicy(policy.id, organizationId);
 
       // Batch controls and send to Claude
       for (let i = 0; i < allControls.length; i += CONTROL_BATCH_SIZE) {
@@ -69,6 +70,7 @@ export async function runAnalysis(analysisId: string, frameworkId: string, trigg
             const control = batch.find((c: { control_code: string }) => c.control_code === mapping.control_code);
             if (control) {
               await createMapping(
+                organizationId,
                 policy.id,
                 control.id,
                 mapping.coverage,
@@ -84,13 +86,13 @@ export async function runAnalysis(analysisId: string, frameworkId: string, trigg
       }
     }
 
-    // Compute coverage stats
+    // Compute coverage stats for this organization
     const mappedControlsResult = await query(
       `SELECT DISTINCT pcm.control_id, pcm.coverage
        FROM policy_control_mappings pcm
        JOIN framework_controls fc ON pcm.control_id = fc.id
-       WHERE fc.framework_id = $1`,
-      [frameworkId]
+       WHERE pcm.organization_id = $1 AND fc.framework_id = $2`,
+      [organizationId, frameworkId]
     );
 
     const mappedControls = mappedControlsResult.rows;
