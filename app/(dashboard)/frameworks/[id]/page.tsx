@@ -25,8 +25,9 @@ export default function FrameworkDetailPage() {
       fetch(`/api/frameworks/${id}/controls`).then((r) => r.json()),
     ])
       .then(([fw, ctrls]) => {
-        setFramework(fw);
-        setControls(ctrls);
+        // Handle error responses
+        if (fw && !fw.error) setFramework(fw);
+        setControls(Array.isArray(ctrls) ? ctrls : []);
       })
       .catch(console.error)
       .finally(() => setLoading(false));
@@ -36,17 +37,19 @@ export default function FrameworkDetailPage() {
     e.preventDefault();
     if (!search.trim()) {
       const res = await fetch(`/api/frameworks/${id}/controls`);
-      setControls(await res.json());
+      const data = await res.json();
+      setControls(Array.isArray(data) ? data : []);
       return;
     }
     const res = await fetch(`/api/frameworks/${id}/controls?search=${encodeURIComponent(search)}`);
-    setControls(await res.json());
+    const data = await res.json();
+    setControls(Array.isArray(data) ? data : []);
   }
 
   async function loadControlDetail(controlId: string) {
     const res = await fetch(`/api/frameworks/${id}/controls?control_id=${controlId}`);
     const data = await res.json();
-    setSelectedControl(data);
+    if (data && !data.error) setSelectedControl(data);
   }
 
   function toggleCategory(catId: string) {

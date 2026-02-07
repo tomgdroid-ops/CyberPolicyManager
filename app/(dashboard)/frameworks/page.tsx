@@ -14,7 +14,10 @@ export default function FrameworksPage() {
   useEffect(() => {
     fetch("/api/frameworks")
       .then((res) => res.json())
-      .then(setFrameworks)
+      .then((data) => {
+        // Handle error responses
+        setFrameworks(Array.isArray(data) ? data : []);
+      })
       .catch(console.error)
       .finally(() => setLoading(false));
   }, []);

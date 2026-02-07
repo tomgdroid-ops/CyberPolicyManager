@@ -16,7 +16,10 @@ export default function PolicyHistoryPage() {
   useEffect(() => {
     fetch(`/api/policies/${id}/history`)
       .then((res) => res.json())
-      .then(setVersions)
+      .then((data) => {
+        // Handle error responses
+        setVersions(Array.isArray(data) ? data : []);
+      })
       .catch(console.error)
       .finally(() => setLoading(false));
   }, [id]);

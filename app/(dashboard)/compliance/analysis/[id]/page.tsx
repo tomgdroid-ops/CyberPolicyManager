@@ -17,13 +17,16 @@ export default function AnalysisDetailPage() {
   useEffect(() => {
     fetch(`/api/analysis/${id}`)
       .then((r) => r.json())
-      .then(setAnalysis)
+      .then((data) => {
+        // Handle error responses
+        if (data && !data.error) setAnalysis(data);
+      })
       .catch(console.error)
       .finally(() => setLoading(false));
   }, [id]);
 
   if (loading) return <div className="h-64 animate-pulse rounded bg-muted" />;
-  if (!analysis) return <p>Analysis not found.</p>;
+  if (!analysis) return <p>Analysis not found or you don&apos;t have access.</p>;
 
   return (
     <div className="space-y-6 max-w-4xl">

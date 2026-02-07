@@ -14,7 +14,11 @@ export default function ReportsPage() {
   useEffect(() => {
     fetch("/api/analysis")
       .then((r) => r.json())
-      .then((data) => setAnalyses(data.filter((a: AnalysisResult) => a.status === "completed")))
+      .then((data) => {
+        // Handle error responses
+        const list = Array.isArray(data) ? data : [];
+        setAnalyses(list.filter((a: AnalysisResult) => a.status === "completed"));
+      })
       .catch(console.error)
       .finally(() => setLoading(false));
   }, []);

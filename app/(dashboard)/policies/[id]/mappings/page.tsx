@@ -40,8 +40,12 @@ export default function PolicyMappingsPage() {
         fetch(`/api/policies/${id}/mappings`),
         fetch("/api/frameworks"),
       ]);
-      setMappings(await mappingsRes.json());
-      setFrameworks(await frameworksRes.json());
+      const mappingsData = await mappingsRes.json();
+      const frameworksData = await frameworksRes.json();
+
+      // Handle error responses - API may return { error: "..." } instead of array
+      setMappings(Array.isArray(mappingsData) ? mappingsData : []);
+      setFrameworks(Array.isArray(frameworksData) ? frameworksData : []);
     } catch (error) {
       console.error(error);
     } finally {
@@ -54,7 +58,9 @@ export default function PolicyMappingsPage() {
     const params = new URLSearchParams();
     if (controlSearch) params.set("search", controlSearch);
     const res = await fetch(`/api/frameworks/${selectedFramework}/controls?${params}`);
-    setControls(await res.json());
+    const data = await res.json();
+    // Handle error responses
+    setControls(Array.isArray(data) ? data : []);
   }
 
   useEffect(() => {
