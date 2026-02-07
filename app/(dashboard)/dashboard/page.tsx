@@ -29,7 +29,12 @@ export default function DashboardPage() {
   useEffect(() => {
     fetch("/api/dashboard/stats")
       .then((res) => res.json())
-      .then(setStats)
+      .then((data) => {
+        // Handle error responses - API may return { error: "..." }
+        if (data && !data.error) {
+          setStats(data);
+        }
+      })
       .catch(console.error)
       .finally(() => setLoading(false));
   }, []);

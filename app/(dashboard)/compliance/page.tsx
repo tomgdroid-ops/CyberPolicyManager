@@ -26,10 +26,14 @@ export default function CompliancePage() {
       fetch("/api/analysis").then((r) => r.json()),
     ])
       .then(([fws, als]) => {
-        setFrameworks(fws);
-        setAnalyses(als);
-        if (fws.length > 0) setSelectedFramework(fws[0].id);
-        const completed = als.filter((a: AnalysisResult) => a.status === "completed");
+        // Handle error responses - API may return { error: "..." } instead of array
+        const frameworkList = Array.isArray(fws) ? fws : [];
+        const analysisList = Array.isArray(als) ? als : [];
+
+        setFrameworks(frameworkList);
+        setAnalyses(analysisList);
+        if (frameworkList.length > 0) setSelectedFramework(frameworkList[0].id);
+        const completed = analysisList.filter((a: AnalysisResult) => a.status === "completed");
         if (completed.length > 0) setLatestAnalysis(completed[0]);
       })
       .catch(console.error)
