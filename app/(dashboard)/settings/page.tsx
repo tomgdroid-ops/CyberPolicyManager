@@ -107,6 +107,7 @@ export default function SettingsPage() {
   const [folderError, setFolderError] = useState<string | null>(null);
   const [directoryHandle, setDirectoryHandle] = useState<FileSystemDirectoryHandle | null>(null);
   const [supportsFileSystemAPI, setSupportsFileSystemAPI] = useState(false);
+  const [importingFile, setImportingFile] = useState<string | null>(null);
 
   // Check if File System Access API is supported
   useEffect(() => {
@@ -347,6 +348,57 @@ export default function SettingsPage() {
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   }
 
+  // Import a file from the folder as a new policy
+  async function handleImportFile(file: FolderFile) {
+    if (!directoryHandle) {
+      addToast({
+        title: "Error",
+        description: "Please select a folder first",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setImportingFile(file.name);
+
+    try {
+      // Get the file handle and read the file
+      const fileHandle = await directoryHandle.getFileHandle(file.name);
+      const fileData = await fileHandle.getFile();
+
+      // Create form data to send to API
+      const formData = new FormData();
+      formData.append("file", fileData);
+
+      const res = await fetch("/api/policies/import", {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to import file");
+      }
+
+      addToast({
+        title: "Policy imported",
+        description: `"${data.policy.policy_name}" has been created`,
+      });
+
+      // Remove the imported file from the list
+      setFolderFiles((prev) => prev.filter((f) => f.name !== file.name));
+    } catch (error) {
+      addToast({
+        title: "Import failed",
+        description: error instanceof Error ? error.message : "Failed to import file",
+        variant: "destructive",
+      });
+    } finally {
+      setImportingFile(null);
+    }
+  }
+
   const getRoleDisplayName = (role: string) => {
     switch (role) {
       case "org_admin":
@@ -565,8 +617,16 @@ export default function SettingsPage() {
                         </p>
                       </div>
                     </div>
-                    <Button variant="outline" size="sm">
-                      Import
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleImportFile(file)}
+                      disabled={importingFile === file.name || !directoryHandle}
+                    >
+                      {importingFile === file.name ? (
+                        <RefreshCw className="h-3 w-3 animate-spin mr-1" />
+                      ) : null}
+                      {importingFile === file.name ? "Importing..." : "Import"}
                     </Button>
                   </div>
                 ))}
