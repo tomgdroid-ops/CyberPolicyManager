@@ -636,26 +636,45 @@ export default function SettingsPage() {
                       </div>
                     </div>
                     {importedFiles.has(file.name) ? (
-                      <Button
-                        variant="muted"
-                        size="sm"
+                      <button
                         disabled
+                        style={{
+                          backgroundColor: '#e5e7eb',
+                          color: '#6b7280',
+                          padding: '0.375rem 0.75rem',
+                          borderRadius: '0.375rem',
+                          fontSize: '0.875rem',
+                          fontWeight: 500,
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          cursor: 'default',
+                        }}
                       >
                         <Check className="h-3 w-3 mr-1" />
                         Imported
-                      </Button>
+                      </button>
                     ) : (
-                      <Button
-                        variant="success"
-                        size="sm"
+                      <button
                         onClick={() => handleImportFile(file)}
                         disabled={importingFile === file.name || !handlesReady}
+                        style={{
+                          backgroundColor: importingFile === file.name || !handlesReady ? '#9ca3af' : '#16a34a',
+                          color: 'white',
+                          padding: '0.375rem 0.75rem',
+                          borderRadius: '0.375rem',
+                          fontSize: '0.875rem',
+                          fontWeight: 500,
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          cursor: importingFile === file.name || !handlesReady ? 'not-allowed' : 'pointer',
+                          border: 'none',
+                        }}
                       >
                         {importingFile === file.name ? (
                           <RefreshCw className="h-3 w-3 animate-spin mr-1" />
                         ) : null}
                         {importingFile === file.name ? "Importing..." : "Import"}
-                      </Button>
+                      </button>
                     )}
                   </div>
                 ))}
