@@ -623,20 +623,19 @@ export default function SettingsPage() {
                     </div>
                     {importedFiles.has(file.name) ? (
                       <Button
-                        variant="outline"
+                        variant="muted"
                         size="sm"
                         disabled
-                        className="bg-gray-100 text-gray-500 cursor-default"
                       >
                         <Check className="h-3 w-3 mr-1" />
                         Imported
                       </Button>
                     ) : (
                       <Button
+                        variant="success"
                         size="sm"
                         onClick={() => handleImportFile(file)}
                         disabled={importingFile === file.name || !file.fileHandle}
-                        className="bg-green-600 hover:bg-green-700 text-white"
                       >
                         {importingFile === file.name ? (
                           <RefreshCw className="h-3 w-3 animate-spin mr-1" />
