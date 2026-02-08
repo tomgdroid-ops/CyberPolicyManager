@@ -9,8 +9,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/components/ui/toast";
-import { Shield, User, Building2, FolderOpen, RefreshCw, Save, AlertTriangle, CheckCircle, FileText } from "lucide-react";
+import { Shield, User, Building2, FolderOpen, RefreshCw, Save, AlertTriangle, CheckCircle, FileText, Search } from "lucide-react";
 import { Organization } from "@/types/organization";
+import { FolderBrowserDialog } from "@/components/folder-browser-dialog";
 
 interface FolderFile {
   name: string;
@@ -31,6 +32,7 @@ export default function SettingsPage() {
   const [syncEnabled, setSyncEnabled] = useState(false);
   const [folderFiles, setFolderFiles] = useState<FolderFile[]>([]);
   const [folderError, setFolderError] = useState<string | null>(null);
+  const [browserOpen, setBrowserOpen] = useState(false);
 
   const currentOrgId = session?.user?.currentOrganization?.id;
   const isAdmin = session?.user?.currentOrganization?.role === "org_admin" || session?.user?.isSuperAdmin;
@@ -238,6 +240,14 @@ export default function SettingsPage() {
                 />
                 <Button
                   variant="outline"
+                  onClick={() => setBrowserOpen(true)}
+                  title="Browse for folder"
+                >
+                  <Search className="h-4 w-4" />
+                  <span className="ml-2">Browse</span>
+                </Button>
+                <Button
+                  variant="outline"
                   onClick={scanFolder}
                   disabled={scanning || !folderPath}
                 >
@@ -253,6 +263,17 @@ export default function SettingsPage() {
                 Enter the full path to your policy documents folder. Supported formats: PDF, DOCX, DOC, TXT, MD
               </p>
             </div>
+
+            <FolderBrowserDialog
+              open={browserOpen}
+              onOpenChange={setBrowserOpen}
+              onSelect={(path) => {
+                setFolderPath(path);
+                setFolderFiles([]);
+                setFolderError(null);
+              }}
+              initialPath={folderPath}
+            />
 
             <div className="flex items-center justify-between rounded-lg border p-4">
               <div className="space-y-0.5">

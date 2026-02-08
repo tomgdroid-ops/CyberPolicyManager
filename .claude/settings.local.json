@@ -24,7 +24,8 @@
       "Bash(npx --yes shadcn@latest init -d)",
       "Bash(npx --yes shadcn@latest add dropdown-menu:*)",
       "Bash(test:*)",
-      "Bash(npx shadcn@latest add switch:*)"
+      "Bash(npx shadcn@latest add switch:*)",
+      "Bash(npx shadcn@latest add scroll-area -y)"
     ]
   }
 }
