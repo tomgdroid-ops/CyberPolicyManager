@@ -141,14 +141,27 @@ export default function SettingsPage() {
       const handle = await loadDirectoryHandle(currentOrgId);
       if (handle) {
         // Verify we still have permission
-        const permission = await (handle as any).queryPermission({ mode: "read" });
+        let permission = await (handle as any).queryPermission({ mode: "read" });
+
+        // If permission not granted, try to request it
+        if (permission !== "granted") {
+          try {
+            permission = await (handle as any).requestPermission({ mode: "read" });
+          } catch {
+            // User denied or browser blocked the request
+            console.log("Permission request was denied or blocked");
+          }
+        }
+
         if (permission === "granted") {
           setDirectoryHandle(handle);
           setFolderPath(handle.name);
           // Auto-scan the folder
           await scanFolderWithHandle(handle);
         } else {
-          console.log("Permission not granted, need to re-select folder");
+          // Still show the folder name so user knows a folder was previously selected
+          setFolderPath(handle.name);
+          console.log("Permission not granted, user needs to click Browse to reconnect");
         }
       }
     } catch (error) {
