@@ -7,8 +7,73 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PolicyStatusBadge } from "@/components/policies/policy-status-badge";
-import { Policy, PolicyStatus } from "@/types/policy";
-import { Plus, Search, FileText } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Policy, PolicyStatus, ControlMappingSummary } from "@/types/policy";
+import { Plus, Search, FileText, Link as LinkIcon } from "lucide-react";
+
+// Component to display control mappings in a compact way
+function ControlMappingsCell({ mappings, policyId }: { mappings: ControlMappingSummary[] | null | undefined; policyId: string }) {
+  if (!mappings || mappings.length === 0) {
+    return (
+      <Link href={`/policies/${policyId}/mappings`} className="text-muted-foreground hover:text-primary text-xs flex items-center gap-1">
+        <LinkIcon className="h-3 w-3" />
+        No mappings
+      </Link>
+    );
+  }
+
+  // Group by framework
+  const byFramework = mappings.reduce((acc, m) => {
+    if (!acc[m.framework_code]) acc[m.framework_code] = [];
+    acc[m.framework_code].push(m);
+    return acc;
+  }, {} as Record<string, ControlMappingSummary[]>);
+
+  const frameworkCodes = Object.keys(byFramework);
+  const totalMappings = mappings.length;
+  const MAX_DISPLAY = 3;
+
+  return (
+    <Link href={`/policies/${policyId}/mappings`} className="block hover:opacity-80">
+      <div className="flex flex-wrap gap-1 max-w-xs">
+        {frameworkCodes.slice(0, 2).map((fw) => {
+          const controls = byFramework[fw];
+          const displayControls = controls.slice(0, MAX_DISPLAY);
+          const remaining = controls.length - MAX_DISPLAY;
+
+          return (
+            <div key={fw} className="flex flex-wrap gap-0.5">
+              {displayControls.map((ctrl) => (
+                <Badge
+                  key={`${fw}-${ctrl.control_code}`}
+                  variant={ctrl.coverage === "full" ? "finalized" : ctrl.coverage === "partial" ? "review" : "secondary"}
+                  className="text-[10px] px-1 py-0"
+                >
+                  {ctrl.control_code}
+                </Badge>
+              ))}
+              {remaining > 0 && (
+                <Badge variant="outline" className="text-[10px] px-1 py-0">
+                  +{remaining}
+                </Badge>
+              )}
+            </div>
+          );
+        })}
+        {frameworkCodes.length > 2 && (
+          <Badge variant="outline" className="text-[10px] px-1 py-0">
+            +{frameworkCodes.length - 2} frameworks
+          </Badge>
+        )}
+        {totalMappings > 0 && (
+          <span className="text-[10px] text-muted-foreground ml-1">
+            ({totalMappings} total)
+          </span>
+        )}
+      </div>
+    </Link>
+  );
+}
 
 export default function PoliciesPage() {
   const [policies, setPolicies] = useState<Policy[]>([]);
@@ -108,9 +173,9 @@ export default function PoliciesPage() {
                     <th className="pb-3 pr-4 font-medium">Code</th>
                     <th className="pb-3 pr-4 font-medium">Policy Name</th>
                     <th className="pb-3 pr-4 font-medium">Status</th>
+                    <th className="pb-3 pr-4 font-medium">Control Mappings</th>
                     <th className="pb-3 pr-4 font-medium">Version</th>
                     <th className="pb-3 pr-4 font-medium">Owner</th>
-                    <th className="pb-3 pr-4 font-medium">Review Date</th>
                     <th className="pb-3 font-medium">Updated</th>
                   </tr>
                 </thead>
@@ -130,16 +195,14 @@ export default function PoliciesPage() {
                       <td className="py-3 pr-4">
                         <PolicyStatusBadge status={policy.status} />
                       </td>
+                      <td className="py-3 pr-4">
+                        <ControlMappingsCell mappings={policy.control_mappings} policyId={policy.id} />
+                      </td>
                       <td className="py-3 pr-4 text-muted-foreground">
                         v{policy.version_major}.{policy.version_minor}
                       </td>
                       <td className="py-3 pr-4 text-muted-foreground">
                         {policy.owner_name || "-"}
-                      </td>
-                      <td className="py-3 pr-4 text-muted-foreground">
-                        {policy.review_date
-                          ? new Date(policy.review_date).toLocaleDateString()
-                          : "-"}
                       </td>
                       <td className="py-3 text-muted-foreground">
                         {new Date(policy.updated_at).toLocaleDateString()}

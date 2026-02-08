@@ -25,6 +25,14 @@ export interface Policy {
   updated_at: string;
   owner_name?: string;
   author_name?: string;
+  mapping_count?: number;
+  control_mappings?: ControlMappingSummary[] | null;
+}
+
+export interface ControlMappingSummary {
+  control_code: string;
+  framework_code: string;
+  coverage: "full" | "partial" | "none";
 }
 
 export interface CreatePolicyInput {

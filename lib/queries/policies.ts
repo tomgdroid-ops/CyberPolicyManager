@@ -37,7 +37,18 @@ export async function listPolicies(
     `SELECT p.*,
             o.name as owner_name,
             a.name as author_name,
-            (SELECT COUNT(*) FROM policy_control_mappings m WHERE m.policy_id = p.id) as mapping_count
+            (SELECT COUNT(*) FROM policy_control_mappings m WHERE m.policy_id = p.id) as mapping_count,
+            (
+              SELECT json_agg(json_build_object(
+                'control_code', fc.control_code,
+                'framework_code', f.code,
+                'coverage', pcm.coverage
+              ) ORDER BY f.code, fc.control_code)
+              FROM policy_control_mappings pcm
+              JOIN framework_controls fc ON pcm.control_id = fc.id
+              JOIN frameworks f ON fc.framework_id = f.id
+              WHERE pcm.policy_id = p.id
+            ) as control_mappings
      FROM policies p
      LEFT JOIN users o ON p.owner_id = o.id
      LEFT JOIN users a ON p.author_id = a.id
