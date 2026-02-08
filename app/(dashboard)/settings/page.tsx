@@ -65,6 +65,7 @@ interface FolderFile {
   size: number;
   modified: string;
   type: "file" | "directory";
+  fileHandle?: FileSystemFileHandle; // Store handle for direct file access
 }
 
 // Type declarations for File System Access API
@@ -283,6 +284,7 @@ export default function SettingsPage() {
               size: file.size,
               modified: file.lastModified ? new Date(file.lastModified).toISOString() : new Date().toISOString(),
               type: "file",
+              fileHandle: fileHandle, // Store the handle for later import
             });
           }
         }
@@ -351,12 +353,12 @@ export default function SettingsPage() {
 
   // Import a file from the folder as a new policy
   async function handleImportFile(file: FolderFile) {
-    console.log("Importing file:", file.name, "directoryHandle:", !!directoryHandle);
+    console.log("Importing file:", file.name, "fileHandle:", !!file.fileHandle);
 
-    if (!directoryHandle) {
+    if (!file.fileHandle) {
       addToast({
         title: "Error",
-        description: "Please select a folder first",
+        description: "File handle not available. Please rescan the folder.",
         variant: "destructive",
       });
       return;
@@ -365,9 +367,8 @@ export default function SettingsPage() {
     setImportingFile(file.name);
 
     try {
-      // Get the file handle and read the file
-      const fileHandle = await directoryHandle.getFileHandle(file.name);
-      const fileData = await fileHandle.getFile();
+      // Get the file from the stored handle
+      const fileData = await file.fileHandle.getFile();
 
       // Create form data to send to API
       const formData = new FormData();
@@ -634,7 +635,7 @@ export default function SettingsPage() {
                       <Button
                         size="sm"
                         onClick={() => handleImportFile(file)}
-                        disabled={importingFile === file.name || !directoryHandle}
+                        disabled={importingFile === file.name || !file.fileHandle}
                         className="bg-green-600 hover:bg-green-700 text-white"
                       >
                         {importingFile === file.name ? (
