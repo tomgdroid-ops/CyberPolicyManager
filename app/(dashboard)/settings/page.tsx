@@ -109,6 +109,7 @@ export default function SettingsPage() {
   const [supportsFileSystemAPI, setSupportsFileSystemAPI] = useState(false);
   const [importingFile, setImportingFile] = useState<string | null>(null);
   const [importedFiles, setImportedFiles] = useState<Set<string>>(new Set());
+  const [handlesReady, setHandlesReady] = useState(false); // Track when handles are loaded
 
   // Use a ref to store file handles - React state may not preserve native objects properly
   const fileHandlesRef = useRef<Map<string, FileSystemFileHandle>>(new Map());
@@ -271,6 +272,7 @@ export default function SettingsPage() {
     setScanning(true);
     setFolderError(null);
     setFolderFiles([]);
+    setHandlesReady(false); // Reset handles ready state
     fileHandlesRef.current.clear(); // Clear previous handles
 
     try {
@@ -303,6 +305,7 @@ export default function SettingsPage() {
 
       console.log("Setting folderFiles, count:", files.length, "handles in ref:", fileHandlesRef.current.size);
       setFolderFiles(files);
+      setHandlesReady(true); // Signal that handles are ready
       if (files.length === 0) {
         setFolderError("No policy files found. Supported formats: PDF, DOCX, DOC, TXT, MD, RTF");
       }
@@ -646,7 +649,7 @@ export default function SettingsPage() {
                         variant="success"
                         size="sm"
                         onClick={() => handleImportFile(file)}
-                        disabled={importingFile === file.name || !fileHandlesRef.current.has(file.name)}
+                        disabled={importingFile === file.name || !handlesReady}
                       >
                         {importingFile === file.name ? (
                           <RefreshCw className="h-3 w-3 animate-spin mr-1" />
