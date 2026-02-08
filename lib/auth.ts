@@ -95,6 +95,31 @@ export const authOptions: NextAuthOptions = {
         }
       }
 
+      // Handle refreshing organizations list
+      if (trigger === "update" && session?.refreshOrganizations) {
+        const updatedOrgs = await refreshUserOrganizations(token.id as string);
+        token.organizations = updatedOrgs;
+
+        // If current org no longer exists, switch to first available
+        const currentOrgStillExists = updatedOrgs.some(
+          (org) => org.id === token.currentOrganizationId
+        );
+        if (!currentOrgStillExists && updatedOrgs.length > 0) {
+          const primaryOrg = updatedOrgs.find((o) => o.isPrimary);
+          token.currentOrganizationId = primaryOrg?.id || updatedOrgs[0]?.id;
+        }
+
+        // If switching to a new org was requested
+        if (session.switchToOrganizationId) {
+          const hasAccess = updatedOrgs.some(
+            (org) => org.id === session.switchToOrganizationId
+          );
+          if (hasAccess) {
+            token.currentOrganizationId = session.switchToOrganizationId;
+          }
+        }
+      }
+
       return token;
     },
     async session({ session, token }) {

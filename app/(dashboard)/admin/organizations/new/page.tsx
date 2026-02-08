@@ -12,7 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import Link from "next/link";
 
 export default function NewOrganizationPage() {
-  const { data: session, status } = useSession();
+  const { data: session, status, update } = useSession();
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -57,6 +57,11 @@ export default function NewOrganizationPage() {
         const data = await res.json();
         throw new Error(data.error || "Failed to create organization");
       }
+
+      const { organization } = await res.json();
+
+      // Refresh session to include the new organization in the list
+      await update({ refreshOrganizations: true, switchToOrganizationId: organization.id });
 
       router.push("/admin/organizations");
     } catch (err) {
