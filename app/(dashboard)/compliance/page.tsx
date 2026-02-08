@@ -151,7 +151,7 @@ export default function CompliancePage() {
             <Card>
               <CardContent className="p-6 text-center">
                 <p className="text-sm text-muted-foreground">Overall Score</p>
-                <p className="text-4xl font-bold text-primary">{(latestAnalysis.overall_score || 0).toFixed(0)}%</p>
+                <p className="text-4xl font-bold text-primary">{parseFloat(String(latestAnalysis.overall_score || 0)).toFixed(0)}%</p>
               </CardContent>
             </Card>
             <Card>
@@ -206,16 +206,21 @@ export default function CompliancePage() {
                       <span className="w-20 font-mono text-sm text-primary">{cat.category_code}</span>
                       <span className="w-48 text-sm">{cat.category_name}</span>
                       <div className="flex-1 h-4 rounded-full bg-muted overflow-hidden">
-                        <div
-                          className={`h-full rounded-full ${
-                            cat.score >= 80 ? "bg-green-500" :
-                            cat.score >= 60 ? "bg-amber-500" :
-                            cat.score >= 40 ? "bg-orange-500" : "bg-red-500"
-                          }`}
-                          style={{ width: `${cat.score}%` }}
-                        />
+                        {(() => {
+                          const score = parseFloat(String(cat.score || 0));
+                          return (
+                            <div
+                              className={`h-full rounded-full ${
+                                score >= 80 ? "bg-green-500" :
+                                score >= 60 ? "bg-amber-500" :
+                                score >= 40 ? "bg-orange-500" : "bg-red-500"
+                              }`}
+                              style={{ width: `${score}%` }}
+                            />
+                          );
+                        })()}
                       </div>
-                      <span className="w-16 text-right font-medium">{cat.score.toFixed(0)}%</span>
+                      <span className="w-16 text-right font-medium">{parseFloat(String(cat.score || 0)).toFixed(0)}%</span>
                     </div>
                   ))}
                 </div>
