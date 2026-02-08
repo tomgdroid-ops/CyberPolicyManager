@@ -9,9 +9,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/components/ui/toast";
-import { Shield, User, Building2, FolderOpen, RefreshCw, Save, AlertTriangle, CheckCircle, FileText, Search } from "lucide-react";
+import { Shield, User, Building2, FolderOpen, RefreshCw, Save, AlertTriangle, CheckCircle, FileText, Search, Folder } from "lucide-react";
 import { Organization } from "@/types/organization";
-import { FolderBrowserDialog } from "@/components/folder-browser-dialog";
+
+// Supported policy file extensions
+const SUPPORTED_EXTENSIONS = [".pdf", ".docx", ".doc", ".txt", ".md", ".rtf"];
 
 interface FolderFile {
   name: string;
@@ -20,6 +22,33 @@ interface FolderFile {
   modified: string;
   type: "file" | "directory";
 }
+
+// Type declarations for File System Access API
+declare global {
+  interface Window {
+    showDirectoryPicker?: (options?: {
+      id?: string;
+      mode?: "read" | "readwrite";
+      startIn?: "desktop" | "documents" | "downloads" | "music" | "pictures" | "videos";
+    }) => Promise<FileSystemDirectoryHandle>;
+  }
+}
+
+interface FileSystemDirectoryHandle {
+  kind: "directory";
+  name: string;
+  values(): AsyncIterableIterator<FileSystemHandle>;
+  getDirectoryHandle(name: string): Promise<FileSystemDirectoryHandle>;
+  getFileHandle(name: string): Promise<FileSystemFileHandle>;
+}
+
+interface FileSystemFileHandle {
+  kind: "file";
+  name: string;
+  getFile(): Promise<File>;
+}
+
+type FileSystemHandle = FileSystemDirectoryHandle | FileSystemFileHandle;
 
 export default function SettingsPage() {
   const { data: session } = useSession();
@@ -32,7 +61,13 @@ export default function SettingsPage() {
   const [syncEnabled, setSyncEnabled] = useState(false);
   const [folderFiles, setFolderFiles] = useState<FolderFile[]>([]);
   const [folderError, setFolderError] = useState<string | null>(null);
-  const [browserOpen, setBrowserOpen] = useState(false);
+  const [directoryHandle, setDirectoryHandle] = useState<FileSystemDirectoryHandle | null>(null);
+  const [supportsFileSystemAPI, setSupportsFileSystemAPI] = useState(false);
+
+  // Check if File System Access API is supported
+  useEffect(() => {
+    setSupportsFileSystemAPI(typeof window !== "undefined" && "showDirectoryPicker" in window);
+  }, []);
 
   const currentOrgId = session?.user?.currentOrganization?.id;
   const isAdmin = session?.user?.currentOrganization?.role === "org_admin" || session?.user?.isSuperAdmin;
@@ -93,9 +128,94 @@ export default function SettingsPage() {
     }
   }
 
+  // Open native folder picker (File System Access API)
+  async function handleBrowseFolder() {
+    if (!window.showDirectoryPicker) {
+      addToast({
+        title: "Not Supported",
+        description: "Your browser doesn't support folder selection. Please use Chrome or Edge.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const handle = await window.showDirectoryPicker({
+        id: "policy-folder",
+        mode: "read",
+        startIn: "documents",
+      });
+
+      setDirectoryHandle(handle);
+      setFolderPath(handle.name); // Show folder name (we can't get full path for security)
+      setFolderFiles([]);
+      setFolderError(null);
+
+      // Automatically scan after selecting
+      await scanFolderWithHandle(handle);
+    } catch (error) {
+      // User cancelled the picker - that's fine, do nothing
+      if (error instanceof Error && error.name === "AbortError") {
+        return;
+      }
+      addToast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to open folder",
+        variant: "destructive",
+      });
+    }
+  }
+
+  // Scan folder using File System Access API handle
+  async function scanFolderWithHandle(handle: FileSystemDirectoryHandle) {
+    setScanning(true);
+    setFolderError(null);
+    setFolderFiles([]);
+
+    try {
+      const files: FolderFile[] = [];
+
+      for await (const entry of handle.values()) {
+        if (entry.kind === "file") {
+          const ext = "." + entry.name.split(".").pop()?.toLowerCase();
+          if (SUPPORTED_EXTENSIONS.includes(ext)) {
+            const fileHandle = entry as FileSystemFileHandle;
+            const file = await fileHandle.getFile();
+            files.push({
+              name: entry.name,
+              path: entry.name, // Can't get full path for security
+              size: file.size,
+              modified: file.lastModified ? new Date(file.lastModified).toISOString() : new Date().toISOString(),
+              type: "file",
+            });
+          }
+        }
+      }
+
+      // Sort by name
+      files.sort((a, b) => a.name.localeCompare(b.name));
+
+      setFolderFiles(files);
+      if (files.length === 0) {
+        setFolderError("No policy files found. Supported formats: PDF, DOCX, DOC, TXT, MD, RTF");
+      }
+    } catch (error) {
+      setFolderError(error instanceof Error ? error.message : "Failed to scan folder");
+    } finally {
+      setScanning(false);
+    }
+  }
+
+  // Scan using stored handle or server API
   async function scanFolder() {
+    if (directoryHandle) {
+      await scanFolderWithHandle(directoryHandle);
+      return;
+    }
+
+    // Fall back to server-side scanning if we have a path but no handle
     if (!folderPath) {
-      setFolderError("Please enter a folder path first");
+      setFolderError("Please select a folder first");
       return;
     }
 
@@ -229,51 +349,57 @@ export default function SettingsPage() {
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="space-y-2">
-              <Label htmlFor="folderPath">Local Folder Path</Label>
+              <Label htmlFor="folderPath">Policy Folder</Label>
               <div className="flex gap-2">
-                <Input
-                  id="folderPath"
-                  value={folderPath}
-                  onChange={(e) => setFolderPath(e.target.value)}
-                  placeholder="C:\Policies or /Users/you/Documents/Policies"
-                  className="flex-1"
-                />
-                <Button
-                  variant="outline"
-                  onClick={() => setBrowserOpen(true)}
-                  title="Browse for folder"
-                >
-                  <Search className="h-4 w-4" />
-                  <span className="ml-2">Browse</span>
-                </Button>
+                {supportsFileSystemAPI ? (
+                  <>
+                    <div className="flex-1 flex items-center px-3 rounded-md border bg-muted/50 text-sm">
+                      {directoryHandle ? (
+                        <span className="flex items-center gap-2">
+                          <FolderOpen className="h-4 w-4 text-primary" />
+                          {directoryHandle.name}
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground">No folder selected</span>
+                      )}
+                    </div>
+                    <Button
+                      variant="outline"
+                      onClick={handleBrowseFolder}
+                      title="Browse for folder"
+                    >
+                      <Search className="h-4 w-4" />
+                      <span className="ml-2">Browse...</span>
+                    </Button>
+                  </>
+                ) : (
+                  <Input
+                    id="folderPath"
+                    value={folderPath}
+                    onChange={(e) => setFolderPath(e.target.value)}
+                    placeholder="C:\Policies or /Users/you/Documents/Policies"
+                    className="flex-1"
+                  />
+                )}
                 <Button
                   variant="outline"
                   onClick={scanFolder}
-                  disabled={scanning || !folderPath}
+                  disabled={scanning || (!folderPath && !directoryHandle)}
                 >
                   {scanning ? (
                     <RefreshCw className="h-4 w-4 animate-spin" />
                   ) : (
-                    <FolderOpen className="h-4 w-4" />
+                    <RefreshCw className="h-4 w-4" />
                   )}
-                  <span className="ml-2">Scan</span>
+                  <span className="ml-2">Refresh</span>
                 </Button>
               </div>
               <p className="text-xs text-muted-foreground">
-                Enter the full path to your policy documents folder. Supported formats: PDF, DOCX, DOC, TXT, MD
+                {supportsFileSystemAPI
+                  ? "Click Browse to select your policy documents folder. Supported: PDF, DOCX, DOC, TXT, MD, RTF"
+                  : "Enter the full path to your folder. For better experience, use Chrome or Edge."}
               </p>
             </div>
-
-            <FolderBrowserDialog
-              open={browserOpen}
-              onOpenChange={setBrowserOpen}
-              onSelect={(path) => {
-                setFolderPath(path);
-                setFolderFiles([]);
-                setFolderError(null);
-              }}
-              initialPath={folderPath}
-            />
 
             <div className="flex items-center justify-between rounded-lg border p-4">
               <div className="space-y-0.5">
