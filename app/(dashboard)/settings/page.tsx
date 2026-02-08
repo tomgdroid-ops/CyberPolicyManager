@@ -15,6 +15,50 @@ import { Organization } from "@/types/organization";
 // Supported policy file extensions
 const SUPPORTED_EXTENSIONS = [".pdf", ".docx", ".doc", ".txt", ".md", ".rtf"];
 
+// IndexedDB helper functions for persisting directory handles
+const DB_NAME = "PolicyVaultStorage";
+const STORE_NAME = "directoryHandles";
+
+async function openDatabase(): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(DB_NAME, 1);
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => resolve(request.result);
+    request.onupgradeneeded = (event) => {
+      const db = (event.target as IDBOpenDBRequest).result;
+      if (!db.objectStoreNames.contains(STORE_NAME)) {
+        db.createObjectStore(STORE_NAME);
+      }
+    };
+  });
+}
+
+async function saveDirectoryHandle(orgId: string, handle: FileSystemDirectoryHandle): Promise<void> {
+  const db = await openDatabase();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(STORE_NAME, "readwrite");
+    const store = transaction.objectStore(STORE_NAME);
+    const request = store.put(handle, `org-${orgId}`);
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => resolve();
+  });
+}
+
+async function loadDirectoryHandle(orgId: string): Promise<FileSystemDirectoryHandle | null> {
+  try {
+    const db = await openDatabase();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction(STORE_NAME, "readonly");
+      const store = transaction.objectStore(STORE_NAME);
+      const request = store.get(`org-${orgId}`);
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => resolve(request.result || null);
+    });
+  } catch {
+    return null;
+  }
+}
+
 interface FolderFile {
   name: string;
   path: string;
@@ -75,10 +119,33 @@ export default function SettingsPage() {
   useEffect(() => {
     if (currentOrgId) {
       fetchOrganization();
+      // Try to restore saved directory handle
+      restoreDirectoryHandle();
     } else {
       setLoading(false);
     }
   }, [currentOrgId]);
+
+  // Restore directory handle from IndexedDB
+  async function restoreDirectoryHandle() {
+    if (!currentOrgId || !supportsFileSystemAPI) return;
+
+    try {
+      const handle = await loadDirectoryHandle(currentOrgId);
+      if (handle) {
+        // Verify we still have permission
+        const permission = await (handle as any).queryPermission({ mode: "read" });
+        if (permission === "granted") {
+          setDirectoryHandle(handle);
+          setFolderPath(handle.name);
+          // Auto-scan the folder
+          await scanFolderWithHandle(handle);
+        }
+      }
+    } catch (error) {
+      console.log("Could not restore directory handle:", error);
+    }
+  }
 
   async function fetchOrganization() {
     try {
@@ -101,6 +168,11 @@ export default function SettingsPage() {
 
     setSaving(true);
     try {
+      // Save directory handle to IndexedDB for persistence
+      if (directoryHandle) {
+        await saveDirectoryHandle(currentOrgId, directoryHandle);
+      }
+
       const res = await fetch(`/api/organizations/${currentOrgId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -358,6 +430,11 @@ export default function SettingsPage() {
                         <span className="flex items-center gap-2">
                           <FolderOpen className="h-4 w-4 text-primary" />
                           {directoryHandle.name}
+                        </span>
+                      ) : folderPath ? (
+                        <span className="flex items-center gap-2 text-amber-600">
+                          <AlertTriangle className="h-4 w-4" />
+                          {folderPath} (click Browse to reconnect)
                         </span>
                       ) : (
                         <span className="text-muted-foreground">No folder selected</span>
