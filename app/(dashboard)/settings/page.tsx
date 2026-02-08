@@ -110,25 +110,32 @@ export default function SettingsPage() {
 
   // Check if File System Access API is supported
   useEffect(() => {
-    setSupportsFileSystemAPI(typeof window !== "undefined" && "showDirectoryPicker" in window);
+    const isSupported = typeof window !== "undefined" && "showDirectoryPicker" in window;
+    setSupportsFileSystemAPI(isSupported);
   }, []);
 
   const currentOrgId = session?.user?.currentOrganization?.id;
   const isAdmin = session?.user?.currentOrganization?.role === "org_admin" || session?.user?.isSuperAdmin;
 
+  // Fetch organization data
   useEffect(() => {
     if (currentOrgId) {
       fetchOrganization();
-      // Try to restore saved directory handle
-      restoreDirectoryHandle();
     } else {
       setLoading(false);
     }
   }, [currentOrgId]);
 
+  // Restore directory handle after we know the org ID and API support
+  useEffect(() => {
+    if (currentOrgId && supportsFileSystemAPI) {
+      restoreDirectoryHandle();
+    }
+  }, [currentOrgId, supportsFileSystemAPI]);
+
   // Restore directory handle from IndexedDB
   async function restoreDirectoryHandle() {
-    if (!currentOrgId || !supportsFileSystemAPI) return;
+    if (!currentOrgId) return;
 
     try {
       const handle = await loadDirectoryHandle(currentOrgId);
@@ -140,6 +147,8 @@ export default function SettingsPage() {
           setFolderPath(handle.name);
           // Auto-scan the folder
           await scanFolderWithHandle(handle);
+        } else {
+          console.log("Permission not granted, need to re-select folder");
         }
       }
     } catch (error) {
