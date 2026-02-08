@@ -35,11 +35,14 @@ function generatePolicyName(filename: string): string {
 }
 
 export async function POST(request: NextRequest) {
+  console.log("Import API called");
   try {
     const { session, organizationId } = await requireOrgUser();
+    console.log("Session verified, org:", organizationId);
 
     const formData = await request.formData();
     const file = formData.get("file") as File;
+    console.log("File received:", file?.name, file?.size);
     const customName = formData.get("policyName") as string | null;
     const customCode = formData.get("policyCode") as string | null;
 

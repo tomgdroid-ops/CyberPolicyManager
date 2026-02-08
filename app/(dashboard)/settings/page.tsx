@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/components/ui/toast";
-import { Shield, User, Building2, FolderOpen, RefreshCw, Save, AlertTriangle, CheckCircle, FileText, Search, Folder } from "lucide-react";
+import { Shield, User, Building2, FolderOpen, RefreshCw, Save, AlertTriangle, CheckCircle, FileText, Search, Folder, Check } from "lucide-react";
 import { Organization } from "@/types/organization";
 
 // Supported policy file extensions
@@ -108,6 +108,7 @@ export default function SettingsPage() {
   const [directoryHandle, setDirectoryHandle] = useState<FileSystemDirectoryHandle | null>(null);
   const [supportsFileSystemAPI, setSupportsFileSystemAPI] = useState(false);
   const [importingFile, setImportingFile] = useState<string | null>(null);
+  const [importedFiles, setImportedFiles] = useState<Set<string>>(new Set());
 
   // Check if File System Access API is supported
   useEffect(() => {
@@ -350,6 +351,8 @@ export default function SettingsPage() {
 
   // Import a file from the folder as a new policy
   async function handleImportFile(file: FolderFile) {
+    console.log("Importing file:", file.name, "directoryHandle:", !!directoryHandle);
+
     if (!directoryHandle) {
       addToast({
         title: "Error",
@@ -386,8 +389,8 @@ export default function SettingsPage() {
         description: `"${data.policy.policy_name}" has been created`,
       });
 
-      // Remove the imported file from the list
-      setFolderFiles((prev) => prev.filter((f) => f.name !== file.name));
+      // Mark the file as imported
+      setImportedFiles((prev) => new Set(prev).add(file.name));
     } catch (error) {
       addToast({
         title: "Import failed",
@@ -617,17 +620,29 @@ export default function SettingsPage() {
                         </p>
                       </div>
                     </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleImportFile(file)}
-                      disabled={importingFile === file.name || !directoryHandle}
-                    >
-                      {importingFile === file.name ? (
-                        <RefreshCw className="h-3 w-3 animate-spin mr-1" />
-                      ) : null}
-                      {importingFile === file.name ? "Importing..." : "Import"}
-                    </Button>
+                    {importedFiles.has(file.name) ? (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled
+                        className="bg-gray-100 text-gray-500 cursor-default"
+                      >
+                        <Check className="h-3 w-3 mr-1" />
+                        Imported
+                      </Button>
+                    ) : (
+                      <Button
+                        size="sm"
+                        onClick={() => handleImportFile(file)}
+                        disabled={importingFile === file.name || !directoryHandle}
+                        className="bg-green-600 hover:bg-green-700 text-white"
+                      >
+                        {importingFile === file.name ? (
+                          <RefreshCw className="h-3 w-3 animate-spin mr-1" />
+                        ) : null}
+                        {importingFile === file.name ? "Importing..." : "Import"}
+                      </Button>
+                    )}
                   </div>
                 ))}
               </div>
