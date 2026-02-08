@@ -1,7 +1,7 @@
 "use client";
 
 import { useSession } from "next-auth/react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
@@ -65,7 +65,6 @@ interface FolderFile {
   size: number;
   modified: string;
   type: "file" | "directory";
-  fileHandle?: FileSystemFileHandle; // Store handle for direct file access
 }
 
 // Type declarations for File System Access API
@@ -110,6 +109,9 @@ export default function SettingsPage() {
   const [supportsFileSystemAPI, setSupportsFileSystemAPI] = useState(false);
   const [importingFile, setImportingFile] = useState<string | null>(null);
   const [importedFiles, setImportedFiles] = useState<Set<string>>(new Set());
+
+  // Use a ref to store file handles - React state may not preserve native objects properly
+  const fileHandlesRef = useRef<Map<string, FileSystemFileHandle>>(new Map());
 
   // Check if File System Access API is supported
   useEffect(() => {
@@ -265,9 +267,11 @@ export default function SettingsPage() {
 
   // Scan folder using File System Access API handle
   async function scanFolderWithHandle(handle: FileSystemDirectoryHandle) {
+    console.log("Scanning folder with handle:", handle.name);
     setScanning(true);
     setFolderError(null);
     setFolderFiles([]);
+    fileHandlesRef.current.clear(); // Clear previous handles
 
     try {
       const files: FolderFile[] = [];
@@ -278,13 +282,17 @@ export default function SettingsPage() {
           if (SUPPORTED_EXTENSIONS.includes(ext)) {
             const fileHandle = entry as FileSystemFileHandle;
             const file = await fileHandle.getFile();
+            console.log("Found file:", entry.name, "handle valid:", !!fileHandle);
+
+            // Store handle in ref (refs persist properly unlike state for native objects)
+            fileHandlesRef.current.set(entry.name, fileHandle);
+
             files.push({
               name: entry.name,
-              path: entry.name, // Can't get full path for security
+              path: entry.name,
               size: file.size,
               modified: file.lastModified ? new Date(file.lastModified).toISOString() : new Date().toISOString(),
               type: "file",
-              fileHandle: fileHandle, // Store the handle for later import
             });
           }
         }
@@ -293,6 +301,7 @@ export default function SettingsPage() {
       // Sort by name
       files.sort((a, b) => a.name.localeCompare(b.name));
 
+      console.log("Setting folderFiles, count:", files.length, "handles in ref:", fileHandlesRef.current.size);
       setFolderFiles(files);
       if (files.length === 0) {
         setFolderError("No policy files found. Supported formats: PDF, DOCX, DOC, TXT, MD, RTF");
@@ -353,9 +362,11 @@ export default function SettingsPage() {
 
   // Import a file from the folder as a new policy
   async function handleImportFile(file: FolderFile) {
-    console.log("Importing file:", file.name, "fileHandle:", !!file.fileHandle);
+    // Get handle from ref instead of from file object
+    const fileHandle = fileHandlesRef.current.get(file.name);
+    console.log("Importing file:", file.name, "fileHandle from ref:", !!fileHandle);
 
-    if (!file.fileHandle) {
+    if (!fileHandle) {
       addToast({
         title: "Error",
         description: "File handle not available. Please rescan the folder.",
@@ -368,7 +379,7 @@ export default function SettingsPage() {
 
     try {
       // Get the file from the stored handle
-      const fileData = await file.fileHandle.getFile();
+      const fileData = await fileHandle.getFile();
 
       // Create form data to send to API
       const formData = new FormData();
@@ -635,7 +646,7 @@ export default function SettingsPage() {
                         variant="success"
                         size="sm"
                         onClick={() => handleImportFile(file)}
-                        disabled={importingFile === file.name || !file.fileHandle}
+                        disabled={importingFile === file.name || !fileHandlesRef.current.has(file.name)}
                       >
                         {importingFile === file.name ? (
                           <RefreshCw className="h-3 w-3 animate-spin mr-1" />
