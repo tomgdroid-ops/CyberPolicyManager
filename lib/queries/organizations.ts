@@ -9,7 +9,8 @@ import {
 // Get all organizations (super_admin only)
 export async function getAllOrganizations(): Promise<Organization[]> {
   const result = await query(
-    `SELECT id, name, slug, industry, description, logo_url, settings, is_active, created_at, updated_at
+    `SELECT id, name, slug, industry, description, logo_url, settings, is_active, created_at, updated_at,
+            policy_folder_path, policy_folder_sync_enabled, policy_folder_last_sync
      FROM organizations
      ORDER BY name ASC`
   );
@@ -20,7 +21,8 @@ export async function getAllOrganizations(): Promise<Organization[]> {
 // Get organization by ID
 export async function getOrganizationById(id: string): Promise<Organization | null> {
   const result = await query(
-    `SELECT id, name, slug, industry, description, logo_url, settings, is_active, created_at, updated_at
+    `SELECT id, name, slug, industry, description, logo_url, settings, is_active, created_at, updated_at,
+            policy_folder_path, policy_folder_sync_enabled, policy_folder_last_sync
      FROM organizations
      WHERE id = $1`,
     [id]
@@ -33,7 +35,8 @@ export async function getOrganizationById(id: string): Promise<Organization | nu
 // Get organization by slug
 export async function getOrganizationBySlug(slug: string): Promise<Organization | null> {
   const result = await query(
-    `SELECT id, name, slug, industry, description, logo_url, settings, is_active, created_at, updated_at
+    `SELECT id, name, slug, industry, description, logo_url, settings, is_active, created_at, updated_at,
+            policy_folder_path, policy_folder_sync_enabled, policy_folder_last_sync
      FROM organizations
      WHERE slug = $1`,
     [slug]
@@ -47,6 +50,7 @@ export async function getOrganizationBySlug(slug: string): Promise<Organization 
 export async function getOrganizationsForUser(userId: string): Promise<OrganizationWithRole[]> {
   const result = await query(
     `SELECT o.id, o.name, o.slug, o.industry, o.description, o.logo_url, o.settings, o.is_active, o.created_at, o.updated_at,
+            o.policy_folder_path, o.policy_folder_sync_enabled, o.policy_folder_last_sync,
             om.role, om.is_primary
      FROM organizations o
      JOIN organization_members om ON o.id = om.organization_id
@@ -121,6 +125,14 @@ export async function updateOrganization(
     updates.push(`is_active = $${paramIndex++}`);
     values.push(input.isActive);
   }
+  if (input.policyFolderPath !== undefined) {
+    updates.push(`policy_folder_path = $${paramIndex++}`);
+    values.push(input.policyFolderPath || null);
+  }
+  if (input.policyFolderSyncEnabled !== undefined) {
+    updates.push(`policy_folder_sync_enabled = $${paramIndex++}`);
+    values.push(input.policyFolderSyncEnabled);
+  }
 
   if (updates.length === 0) {
     return getOrganizationById(id);
@@ -133,7 +145,8 @@ export async function updateOrganization(
     `UPDATE organizations
      SET ${updates.join(", ")}
      WHERE id = $${paramIndex}
-     RETURNING id, name, slug, industry, description, logo_url, settings, is_active, created_at, updated_at`,
+     RETURNING id, name, slug, industry, description, logo_url, settings, is_active, created_at, updated_at,
+               policy_folder_path, policy_folder_sync_enabled, policy_folder_last_sync`,
     values
   );
 
@@ -186,5 +199,8 @@ function mapOrganization(row: Record<string, unknown>): Organization {
     isActive: row.is_active as boolean,
     createdAt: new Date(row.created_at as string),
     updatedAt: new Date(row.updated_at as string),
+    policyFolderPath: row.policy_folder_path as string | undefined,
+    policyFolderSyncEnabled: row.policy_folder_sync_enabled as boolean | undefined,
+    policyFolderLastSync: row.policy_folder_last_sync ? new Date(row.policy_folder_last_sync as string) : undefined,
   };
 }

@@ -16,6 +16,8 @@ const updateOrgSchema = z.object({
   logoUrl: z.string().url().optional(),
   settings: z.record(z.string(), z.unknown()).optional(),
   isActive: z.boolean().optional(),
+  policyFolderPath: z.string().max(1000).nullable().optional(),
+  policyFolderSyncEnabled: z.boolean().optional(),
 });
 
 type RouteContext = {
@@ -104,6 +106,12 @@ export async function PUT(request: Request, context: RouteContext) {
     console.error("Error updating organization:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
+}
+
+// PATCH /api/organizations/[id] - Partial update organization (super_admin or org_admin)
+export async function PATCH(request: Request, context: RouteContext) {
+  // PATCH is an alias for PUT for partial updates
+  return PUT(request, context);
 }
 
 // DELETE /api/organizations/[id] - Deactivate organization (super_admin only)

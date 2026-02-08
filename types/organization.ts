@@ -11,6 +11,10 @@ export interface Organization {
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
+  // Policy folder settings
+  policyFolderPath?: string;
+  policyFolderSyncEnabled?: boolean;
+  policyFolderLastSync?: Date;
 }
 
 export interface OrganizationMember {
@@ -59,6 +63,9 @@ export interface UpdateOrganizationInput {
   logoUrl?: string;
   settings?: Record<string, unknown>;
   isActive?: boolean;
+  // Policy folder settings
+  policyFolderPath?: string | null;
+  policyFolderSyncEnabled?: boolean;
 }
 
 export interface InviteMemberInput {
