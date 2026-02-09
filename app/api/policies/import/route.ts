@@ -6,8 +6,6 @@ import { logAudit } from "@/lib/queries/audit";
 import { extractText } from "@/lib/services/document-parser";
 import { randomUUID } from "crypto";
 import { createHash } from "crypto";
-import * as fs from "fs/promises";
-import * as path from "path";
 
 // Generate a policy code from filename
 function generatePolicyCode(filename: string): string {
@@ -61,13 +59,6 @@ export async function POST(request: NextRequest) {
 
     const buffer = Buffer.from(await file.arrayBuffer());
     const hash = createHash("sha256").update(buffer).digest("hex");
-    const savedFilename = `${randomUUID()}${ext}`;
-    const uploadDir = process.env.UPLOAD_DIR || "./uploads";
-    const filePath = path.join(uploadDir, savedFilename);
-
-    // Ensure upload directory exists
-    await fs.mkdir(uploadDir, { recursive: true });
-    await fs.writeFile(filePath, buffer);
 
     // Extract text content
     let contentText = "";
@@ -94,17 +85,16 @@ export async function POST(request: NextRequest) {
       session.user.id
     );
 
-    // Update with document info
+    // Update with document info (no file path since we're on serverless)
     await query(
       `UPDATE policies SET
         document_filename = $1,
-        document_path = $2,
-        document_hash = $3,
-        document_size_bytes = $4,
-        document_content_text = $5,
+        document_hash = $2,
+        document_size_bytes = $3,
+        document_content_text = $4,
         updated_at = now()
-       WHERE id = $6`,
-      [file.name, filePath, hash, buffer.length, contentText || null, policy.id]
+       WHERE id = $5`,
+      [file.name, hash, buffer.length, contentText || null, policy.id]
     );
 
     // Create initial version
